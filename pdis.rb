@@ -8,7 +8,7 @@ class Player1
   end
 
   def self.to_s
-    "c"
+    "C"
   end
 end
 
@@ -22,20 +22,20 @@ class Player2
   end
 
   def self.to_s
-    "a"
+    " "
   end
 end
 
 class Comparison
   def self.compare(move1, move2)
     if move1 == "cooperate" && move2 == "cooperate"
-      [3, 3]
+      [9, 9]
     elsif move1 == "not cooperate" && move2 == "cooperate"
-      [5, 0]
+      [10, 0]
     elsif move1 == "cooperate" && move2 == "not cooperate"
-      [0, 5]
+      [0, 10]
     else
-      [2, 2]
+      [3, 3]
     end
   end
 end
@@ -70,17 +70,19 @@ class Board
 
   def move(comparison)
     points_in_round = get_points_of_round(make_empty_board(0))
-    print(points_in_round, 5)
     reconfigure_board(points_in_round)
   end
 
   def print(board, padding)
+    puts "_"*(width+2)
     (0..height-1).to_a.each_with_index do |row, i|
+      Kernel.print "|"
       (0..width-1).to_a.each_with_index do |field, j|
         Kernel.print(board[i][j].to_s.center(padding))
       end
-      puts ""
+      puts "|"
     end
+    puts "_"*(width+2)
     puts ""
     puts ""
   end
@@ -146,24 +148,25 @@ class Board
   end
 
   def best_player_in_vicinity(board_points, position)
-    p position
-    best_position = position
+    best_players = [@config[position.first][position.last]]
+    max_points = 0
     (position.first-1..position.first+1).to_a.each do |i|
       (position.last-1..position.last+1).to_a.each do |j|
-        if position == [0,0]
-          p best_position
-          p [i, j, board_points[i][j], board_points[best_position.first, best_position.last]]
-        end
         next unless is_on_board?([i, j])
-        best_position = [i, j] if board_points[i][j] > board_points[best_position.first, best_position.last]
+        if board_points[i][j] > max_points
+          best_players = [@config[i][j] = [i, j]]
+          max_points = board_points[i][j]
+        elsif board_points[i][j] = max_points
+          best_players << [@config[i][j] = [i, j]]
+        end
       end
-    end
-    @config[best_position.first][best_position.last]
+    end    
+    best_players.compact.length == 2 ? @config[position.first][position.last] : best_players.first
   end
 end
 
 
-$b = Board.new(20, 20)
+$b = Board.new(160, 20)
 $b.random_distribution(Player1, Player2)
 
 
@@ -186,9 +189,10 @@ $b.random_distribution(Player1, Player2)
 #end
 
 
-$b.print($b.config, 4)
+$b.print($b.config, 1)
 
-10.times do
+100.times do |i|
+  puts "Move: #{i}"
   $b.move(Comparison)
-  $b.print($b.config, 4)
+  $b.print($b.config, 1)
 end
