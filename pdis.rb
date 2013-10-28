@@ -1,3 +1,6 @@
+# require "colorize"
+require 'curses'
+
 class Player1
   def self.move
     "cooperate"
@@ -7,8 +10,10 @@ class Player1
     [0, 0, 255]
   end
 
-  def self.to_s
-    "C"
+  def self.to_s(newly_so)
+    # newly_so ? "█".green : "█".blue
+    newly_so ? "▒" : "█"
+    # newly_so ? "c" : "C"
   end
 end
 
@@ -21,21 +26,23 @@ class Player2
     [220, 20, 60]
   end
 
-  def self.to_s
-    " "
+  def self.to_s(newly_so)
+    # newly_so ? "█".yellow : "█".red
+    newly_so ? "░" : " "
+    # newly_so ? "d" : "D"
   end
 end
 
 class Comparison
   def self.compare(move1, move2)
     if move1 == "cooperate" && move2 == "cooperate"
-      [9, 9]
+      [1, 1]
     elsif move1 == "not cooperate" && move2 == "cooperate"
-      [10, 0]
+      [1.600000000001, 0] #1.6 to 1.6000000000000001
     elsif move1 == "cooperate" && move2 == "not cooperate"
-      [0, 10]
+      [0, 1.600000000001]
     else
-      [3, 3]
+      [0, 0]
     end
   end
 end
@@ -47,25 +54,16 @@ class Board
     @width = width
     @height = height
     @config = make_empty_board(nil)
+    @old_config = @config
   end
 
-  def random_distribution(*players)
+  def random_distribution(p_for_player1, player1, player2)
+    Random.new
     @config.each_with_index do |row, i|
       row.each_with_index do |field, j|
-        @config[i][j] = players.sample
+        @config[i][j] = rand < p_for_player1 ? player1 : player2
       end
     end
-  end
-
-  def numbers_for_players
-    result = {}
-    @config.each_with_index do |row, i|
-      row.each_with_index do |field, j|
-        result[@config[i][j]] = 0 unless result[@config[i][j]]
-        result[@config[i][j]] += 1
-      end
-    end
-    result
   end
 
   def move(comparison)
@@ -73,18 +71,29 @@ class Board
     reconfigure_board(points_in_round)
   end
 
-  def print(board, padding)
-    puts "_"*(width+2)
+  def print_board
+    puts "-"*(width+2)
     (0..height-1).to_a.each_with_index do |row, i|
       Kernel.print "|"
       (0..width-1).to_a.each_with_index do |field, j|
-        Kernel.print(board[i][j].to_s.center(padding))
+        Kernel.print(@config[i][j].to_s(@config[i][j] != @old_config[i][j]))
       end
       puts "|"
     end
-    puts "_"*(width+2)
+    puts "-"*(width+2)
     puts ""
     puts ""
+  end
+
+  def string_board
+    result = ""
+    (0..height-1).to_a.each_with_index do |row, i|
+      (0..width-1).to_a.each_with_index do |field, j|
+        result << @config[i][j].to_s(@config[i][j] != @old_config[i][j])
+      end
+      result <<  "\n"
+    end
+    result
   end
 
   private
@@ -103,12 +112,6 @@ class Board
   def get_points_of_round(board_points)
     (0..height-1).to_a.each_with_index do |row, i|
       (0..width-1).to_a.each_with_index do |field, j|
-        #play these against each other (right and down is what I play against)
-        #i  , j+1
-        #i+1, j-1
-        #i+1, j
-        #i+1, j+1
-
         play_a_round(board_points, [i, j], [i, j+1])
         play_a_round(board_points, [i, j], [i+1, j-1])
         play_a_round(board_points, [i, j], [i+1, j])
@@ -144,55 +147,60 @@ class Board
       end
     end
 
+    @old_config = @config
     @config = new_config
   end
 
   def best_player_in_vicinity(board_points, position)
-    best_players = [@config[position.first][position.last]]
+    best_players = [@config[position.first][position.last]] # current player is considered best at first 
     max_points = 0
     (position.first-1..position.first+1).to_a.each do |i|
       (position.last-1..position.last+1).to_a.each do |j|
         next unless is_on_board?([i, j])
         if board_points[i][j] > max_points
-          best_players = [@config[i][j] = [i, j]]
+          best_players = [@config[i][j]]
           max_points = board_points[i][j]
-        elsif board_points[i][j] = max_points
-          best_players << [@config[i][j] = [i, j]]
+        elsif board_points[i][j] == max_points
+          best_players << @config[i][j]
         end
       end
     end    
-    best_players.compact.length == 2 ? @config[position.first][position.last] : best_players.first
+    best_players.uniq.length == 2 ? @config[position.first][position.last] : best_players.first
   end
 end
 
 
-$b = Board.new(160, 20)
-$b.random_distribution(Player1, Player2)
-
-
-#Shoes.app(width: $b.width*10, height: $b.height*10) do
-#  def paint_the_board
-#    (0..($b.height-1)).to_a.each_with_index do |row, i|
-#      (0..($b.width-1)).to_a.each_with_index do |field, j|
-#        fill rgb(*$b.config[i][j].color)
-#        rect(left: j * 10, top: i * 10, width: 10)
-#      end
-#    end
-#  end
-#
-#  animate(10) do |frame|
-#    if frame < 20
-#      $b.move(Comparison)
-#      paint_the_board
-#    end
-#  end
-#end
-
-
-$b.print($b.config, 1)
-
-100.times do |i|
-  puts "Move: #{i}"
-  $b.move(Comparison)
-  $b.print($b.config, 1)
+def init_screen
+  Curses.noecho # do not show typed keys
+  Curses.init_screen
+  Curses.stdscr.keypad(true) # enable arrow keys
+  begin
+    yield
+  ensure
+    Curses.close_screen
+  end
 end
+
+def c_write(line, column, text)
+  Curses.setpos(line, column)
+  Curses.addstr(text)
+end
+
+$b = Board.new(150, 50)
+$b.random_distribution(0.8, Player1, Player2)
+
+init_screen do
+  c_write 1,0, $b.string_board
+
+  i = 0
+  loop do
+    c_write 0, 0, "Move: #{i}"
+    $b.move(Comparison)
+    c_write 1,0, $b.string_board
+    i += 1
+    case Curses.getch
+      when ?q then break  
+    end
+  end
+end
+
